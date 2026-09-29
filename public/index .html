@@ -1,0 +1,130 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Tiket Lokasi</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Unbounded:wght@600;800&family=DM+Mono:wght@400;500&display=swap" rel="stylesheet">
+<style>
+:root{--biru:#2a3cff;--biru-tua:#1a26b8;--kuning:#ffd23f;--putih:#fffdf7;--tinta:#141a4d;--abu:#7d84b8}
+*{box-sizing:border-box}
+body{margin:0;min-height:100vh;display:grid;place-items:center;padding:24px;font-family:"DM Mono",monospace;color:var(--tinta);
+  background:
+   radial-gradient(circle at 12% 18%,rgba(255,255,255,.18) 0 90px,transparent 91px),
+   radial-gradient(circle at 88% 82%,rgba(255,210,63,.25) 0 140px,transparent 141px),
+   var(--biru)}
+.wrap{width:min(920px,100%);display:grid;gap:22px}
+form{display:flex;gap:10px;background:var(--putih);padding:8px;border-radius:999px;box-shadow:0 12px 0 -4px var(--biru-tua)}
+label{position:absolute;left:-9999px}
+input{flex:1;min-width:0;border:0;background:none;font:500 1.05rem "DM Mono",monospace;padding:12px 20px;color:var(--tinta)}
+input:focus{outline:none}
+button{border:0;border-radius:999px;background:var(--kuning);color:var(--tinta);font:600 .95rem "Unbounded",sans-serif;padding:0 26px;cursor:pointer}
+button:hover{background:#ffc400}
+button:disabled{opacity:.6;cursor:wait}
+form:focus-within{outline:3px solid var(--kuning);outline-offset:3px}
+#status{color:#dfe3ff;min-height:1.3em;font-size:.95rem;padding-left:8px}
+#status.error{color:var(--kuning)}
+.tiket{display:grid;grid-template-columns:1fr 250px;background:var(--putih);border-radius:24px;position:relative;
+  box-shadow:0 22px 0 -8px var(--biru-tua)}
+.tiket::before,.tiket::after{content:"";position:absolute;right:238px;width:24px;height:24px;border-radius:50%;background:var(--biru)}
+.tiket::before{top:-12px}.tiket::after{bottom:-12px}
+.utama{padding:28px 32px}
+.atas{display:flex;justify-content:space-between;color:var(--abu);font-size:.85rem}
+.tujuan{font:800 clamp(1.7rem,5vw,3rem)/1.05 "Unbounded",sans-serif;margin:14px 0 26px;letter-spacing:-.03em;overflow-wrap:anywhere}
+.info{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+.info span{display:block;color:var(--abu);font-size:.8rem;margin-bottom:4px}
+.info b{font:600 1.05rem "Unbounded",sans-serif;overflow-wrap:anywhere}
+.stub{border-left:2px dashed #c9cdf0;padding:28px 24px;display:flex;flex-direction:column;gap:14px;position:relative}
+.stub span{display:block;color:var(--abu);font-size:.8rem}
+.stub b{font:500 1.25rem "DM Mono",monospace}
+#kode{display:flex;align-items:flex-end;gap:2px;height:46px;margin-top:auto}
+#kode i{display:block;background:var(--tinta);width:3px}
+.cap{position:absolute;right:22px;top:20px;border:3px solid var(--biru);color:var(--biru);border-radius:10px;padding:2px 10px;
+  font:800 .8rem "Unbounded",sans-serif;transform:rotate(-12deg);opacity:0}
+.cap.tampil{animation:cap .4s cubic-bezier(.3,1.6,.5,1) forwards}
+@keyframes cap{from{transform:rotate(-12deg) scale(2.4);opacity:0}to{transform:rotate(-12deg) scale(1);opacity:.85}}
+.identitas{color:#dfe3ff;font-size:.85rem;text-align:center}
+@media (max-width:720px){
+ .tiket{grid-template-columns:1fr}.tiket::before,.tiket::after{display:none}
+ .stub{border-left:0;border-top:2px dashed #c9cdf0}.info{grid-template-columns:1fr}
+}
+@media (prefers-reduced-motion:reduce){.cap.tampil{animation:none;opacity:.85}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <form id="form">
+    <label for="q">Lokasi</label>
+    <input id="q" placeholder="Mau ke mana? Contoh: Yogyakarta" autocomplete="off" required>
+    <button id="cari" type="submit">Cari</button>
+  </form>
+  <div id="status" role="status" aria-live="polite">Ketik lokasi untuk mencetak tiketnya.</div>
+
+  <article class="tiket">
+    <div class="utama">
+      <div class="atas"><span>TIKET LOKASI</span><span>ZEIN / 20240140209</span></div>
+      <div class="tujuan" id="lokasi">Belum ada tujuan</div>
+      <div class="info">
+        <div><span>Negara</span><b id="negara">-</b></div>
+        <div><span>Provinsi</span><b id="provinsi">-</b></div>
+        <div><span>Kecamatan</span><b id="kecamatan">-</b></div>
+      </div>
+    </div>
+    <div class="stub">
+      <div class="cap" id="cap">DITEMUKAN</div>
+      <div><span>Longitude</span><b id="longitude">-</b></div>
+      <div><span>Latitude</span><b id="latitude">-</b></div>
+      <div id="kode" aria-hidden="true"></div>
+    </div>
+  </article>
+</div>
+
+<script>
+const $ = (id) => document.getElementById(id);
+
+// Barcode dekoratif dari angka koordinat, jadi tiap lokasi punya pola sendiri
+function barcode(teks){
+  const k = $("kode"); k.innerHTML = "";
+  for (let i = 0; i < 34; i++){
+    const c = teks.charCodeAt(i % teks.length) + i * 7;
+    const b = document.createElement("i");
+    b.style.width = (1 + c % 4) + "px";
+    b.style.height = (60 + c % 41) + "%";
+    k.appendChild(b);
+  }
+}
+barcode("belum-ada-data");
+
+function isi(d){
+  const v = (t) => t || "-";
+  $("lokasi").textContent = v(d.lokasi);
+  $("negara").textContent = v(d.negara);
+  $("provinsi").textContent = v(d.provinsi);
+  $("kecamatan").textContent = v(d.kecamatan);
+  $("longitude").textContent = Number(d.longitude).toFixed(6);
+  $("latitude").textContent = Number(d.latitude).toFixed(6);
+  barcode(d.longitude + "," + d.latitude);
+  const cap = $("cap"); cap.classList.remove("tampil"); void cap.offsetWidth; cap.classList.add("tampil");
+}
+
+$("form").addEventListener("submit", async (e) => {
+  e.preventDefault();
+  const q = $("q").value.trim(); if (!q) return;
+  const status = $("status"), tombol = $("cari");
+  status.className = ""; status.textContent = "Mencetak tiket...";
+  tombol.disabled = true;
+  try {
+    const res = await fetch("/api/lokasi?q=" + encodeURIComponent(q));
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.message || "Terjadi kesalahan");
+    isi(data);
+    status.textContent = "Tiket siap.";
+  } catch (err) {
+    status.className = "error";
+    status.textContent = err.message + ". Coba nama lain.";
+  } finally { tombol.disabled = false; }
+});
+</script>
+</body>
+</html>
